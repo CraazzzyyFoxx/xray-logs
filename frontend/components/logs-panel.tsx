@@ -119,6 +119,7 @@ export function LogsPanel({ initialItems, initialTotal }: LogsPanelProps) {
                     row.email || "—"
                   )}
                 </TableCell>
+                <TableCell>{row.email || "—"}</TableCell>
                 <TableCell>
                   <div className="text-sm font-medium">{row.source_ip}</div>
                   <div className="text-xs text-muted-foreground">порт {row.source_port}</div>

@@ -1,0 +1,27 @@
+[postgresql]
+host=localhost
+port=5432
+dbname=mydb
+user=myuser
+password=mypassword
+
+[parser]
+; Default logfile path (can be overridden by CLI --logfile)
+logfile=/var/log/xray/xray.log
+
+; JSONL buffer for offline mode
+offline_file=/var/log/xray/pending_logs.jsonl
+
+; Batch size for INSERTs into PostgreSQL
+batch_size=1000
+
+[stats]
+; json or csv (leave empty/omit to disable file-based stats)
+format=json
+
+; Path to stats output file. If omitted, stats are printed to stdout.
+output=/var/log/xray/parser_stats.jsonl
+
+[migration]
+; Whether to drop logs_old after a successful migration
+drop_old=false

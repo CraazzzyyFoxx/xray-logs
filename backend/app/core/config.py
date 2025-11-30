@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
 
     database_url: str = (
-        "postgresql+asyncpg://xray_logs:xray_logs@localhost:5432/xray_logs"
+        "postgresql+asyncpg://system:0wJxwO4x3OQXw9unSolw@home.craazzzyyfoxx.me:5433/xray_logs"
     )
     cors_allow_origins: List[str] = ["http://localhost:3000"]
 

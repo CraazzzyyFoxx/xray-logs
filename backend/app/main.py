@@ -11,6 +11,10 @@ from starlette.responses import Response
 
 from .api.logs import router as logs_router
 from .api.users import router as users_router
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .api.logs import router as logs_router
 from .core.config import settings
 
 app = FastAPI(title="Xray Logs API", version="0.2.0")
@@ -50,6 +54,8 @@ app.add_middleware(TimeMiddleware)
 
 app.include_router(logs_router)
 app.include_router(users_router)
+
+app.include_router(logs_router)
 
 
 @app.get("/health")

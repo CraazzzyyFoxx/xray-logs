@@ -74,6 +74,19 @@ async def list_logs(
     )
     results = await session.execute(rows_stmt, params)
     items = [LogRecord.model_validate(dict(row._mapping)) for row in results]
+    items = [LogRecord(
+        id=row.id,
+        timestamp=row.timestamp,
+        source_ip=str(row.source_ip),
+        source_port=row.source_port,
+        destination_host=str(row.destination_host),
+        destination_port=row.destination_port,
+        protocol=row.protocol,
+        action=row.action,
+        inbound_tag=row.inbound_tag,
+        outbound_tag=row.outbound_tag,
+        email=row.email,
+    ) for row in results]
     return LogsResponse(total=total, items=items)
 
 

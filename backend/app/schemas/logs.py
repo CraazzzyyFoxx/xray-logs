@@ -10,6 +10,7 @@ class LogRecord(BaseModel):
     id: int
     timestamp: datetime = Field(serialization_alias="ts")
     user_id: Optional[int]
+    timestamp: datetime
     source_ip: str
     source_port: int
     destination_host: str

@@ -1,0 +1,62 @@
+[
+  {
+    "timestamp": "2025-01-10T08:15:23.123000",
+    "source_ip": "192.168.1.10",
+    "source_port": 54321,
+    "destination_host": "example.com",
+    "destination_port": 443,
+    "protocol": "tcp",
+    "action": "accepted",
+    "inbound_tag": "inbound",
+    "outbound_tag": "direct",
+    "email": "user@example.com"
+  },
+  {
+    "timestamp": "2025-01-10T08:16:00.000000",
+    "source_ip": "10.0.0.5",
+    "source_port": 60000,
+    "destination_host": "api.internal",
+    "destination_port": 8443,
+    "protocol": "tcp",
+    "action": "accepted",
+    "inbound_tag": "api",
+    "outbound_tag": "api",
+    "email": null
+  },
+  {
+    "timestamp": "2025-01-11T09:05:12.000000",
+    "source_ip": "203.0.113.25",
+    "source_port": 41234,
+    "destination_host": "files.example.net",
+    "destination_port": 22,
+    "protocol": "tcp",
+    "action": "accepted",
+    "inbound_tag": "ssh",
+    "outbound_tag": "proxy",
+    "email": "dev@example.net"
+  },
+  {
+    "timestamp": "2025-01-11T10:22:45.567000",
+    "source_ip": "198.51.100.44",
+    "source_port": 57001,
+    "destination_host": "stream.service",
+    "destination_port": 1935,
+    "protocol": "udp",
+    "action": "accepted",
+    "inbound_tag": "media",
+    "outbound_tag": "direct",
+    "email": "media@example.org"
+  },
+  {
+    "timestamp": "2025-01-12T14:00:00.000000",
+    "source_ip": "172.16.0.9",
+    "source_port": 52000,
+    "destination_host": "analytics.service",
+    "destination_port": 443,
+    "protocol": "tcp",
+    "action": "accepted",
+    "inbound_tag": "metrics",
+    "outbound_tag": "direct",
+    "email": "ops@example.org"
+  }
+]

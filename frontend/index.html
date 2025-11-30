@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xray Logs Viewer</title>
+    <style>
+      :root {
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #0f172a;
+        background-color: #f8fafc;
+      }
+
+      body {
+        margin: 0;
+        padding: 2rem;
+        background: linear-gradient(180deg, #e2e8f0, #f8fafc);
+      }
+
+      h1 {
+        margin-bottom: 0.25rem;
+      }
+
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+
+      .card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+        border: 1px solid rgba(15, 23, 42, 0.05);
+      }
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin: 1rem 0 1.5rem;
+      }
+
+      .filters label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #475569;
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+
+      .filters input,
+      .filters select {
+        padding: 0.65rem 0.85rem;
+        border-radius: 12px;
+        border: 1px solid #cbd5f5;
+        min-width: 200px;
+        font-size: 0.95rem;
+      }
+
+      .table-wrapper {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 0.75rem 0.5rem;
+        text-align: left;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      th {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #94a3b8;
+      }
+
+      tbody tr:hover {
+        background-color: #f1f5f9;
+      }
+
+      .tags {
+        display: inline-flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+      }
+
+      .tag {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.6rem;
+        background-color: #e0f2fe;
+        color: #0369a1;
+        border-radius: 999px;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      .stat-card {
+        background: white;
+        padding: 1rem;
+        border-radius: 14px;
+        border: 1px solid rgba(15, 23, 42, 0.05);
+        box-shadow: 0 5px 15px rgba(15, 23, 42, 0.08);
+      }
+
+      .stat-card h3 {
+        margin: 0;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: #94a3b8;
+      }
+
+      .stat-card p {
+        margin: 0.25rem 0 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: #94a3b8;
+        font-style: italic;
+      }
+
+      @media (max-width: 768px) {
+        body {
+          padding: 1rem;
+        }
+
+        .filters input,
+        .filters select {
+          min-width: unset;
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <h1>Панель логов xray</h1>
+        <p style="margin-top: 0; color: #475569">
+          Просматривайте и фильтруйте последние подключения из подготовленного файла sample_logs.json
+        </p>
+
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <h3>Всего записей</h3>
+            <p id="total-count">0</p>
+          </div>
+          <div class="stat-card">
+            <h3>Протоколов</h3>
+            <p id="protocol-count">0</p>
+          </div>
+          <div class="stat-card">
+            <h3>Уникальных пользователей</h3>
+            <p id="user-count">0</p>
+          </div>
+        </div>
+
+        <form id="filters" class="filters">
+          <div>
+            <label for="search">Поиск</label>
+            <input id="search" name="search" type="text" placeholder="example.com или user@example.com" />
+          </div>
+          <div>
+            <label for="protocol">Протокол</label>
+            <select id="protocol" name="protocol">
+              <option value="">Все</option>
+            </select>
+          </div>
+          <div>
+            <label for="tag">Тег маршрута</label>
+            <select id="tag" name="tag">
+              <option value="">Все</option>
+            </select>
+          </div>
+        </form>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Время</th>
+                <th>Источник</th>
+                <th>Назначение</th>
+                <th>Протокол</th>
+                <th>Теги</th>
+                <th>Пользователь</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+          <div id="empty-state" class="empty-state" hidden>Нет записей по заданным фильтрам</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:8000";
+      const tableBody = document.getElementById("table-body");
+      const emptyState = document.getElementById("empty-state");
+      const protocolSelect = document.getElementById("protocol");
+      const tagSelect = document.getElementById("tag");
+      const totalCount = document.getElementById("total-count");
+      const protocolCount = document.getElementById("protocol-count");
+      const userCount = document.getElementById("user-count");
+
+      async function fetchJson(url) {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error("Ошибка загрузки данных");
+        }
+        return response.json();
+      }
+
+      function buildQuery() {
+        const formData = new FormData(document.getElementById("filters"));
+        const params = new URLSearchParams();
+        for (const [key, value] of formData.entries()) {
+          if (value) {
+            params.append(key, value);
+          }
+        }
+        params.set("limit", "100");
+        return params.toString();
+      }
+
+      function renderRows(items) {
+        tableBody.innerHTML = "";
+        if (!items.length) {
+          emptyState.hidden = false;
+          return;
+        }
+        emptyState.hidden = true;
+        const rows = items
+          .map((item) => {
+            const tags = [item.inbound_tag, item.outbound_tag]
+              .filter(Boolean)
+              .map((tag) => `<span class="tag">${tag}</span>`) 
+              .join(" ");
+            const user = item.email ?? "—";
+            const timestamp = new Date(item.timestamp).toLocaleString();
+            return `
+              <tr>
+                <td>${timestamp}</td>
+                <td>${item.source_ip}:${item.source_port}</td>
+                <td>${item.destination_host}:${item.destination_port}</td>
+                <td>${item.protocol.toUpperCase()}</td>
+                <td class="tags">${tags || "—"}</td>
+                <td>${user}</td>
+              </tr>
+            `;
+          })
+          .join("");
+        tableBody.innerHTML = rows;
+      }
+
+      async function loadStats() {
+        try {
+          const stats = await fetchJson(`${API_BASE}/api/logs/stats`);
+          totalCount.textContent = stats.total;
+          protocolCount.textContent = stats.available_protocols.length;
+          userCount.textContent = stats.unique_users;
+
+          stats.available_protocols.forEach((protocol) => {
+            const option = document.createElement("option");
+            option.value = protocol;
+            option.textContent = protocol.toUpperCase();
+            protocolSelect.appendChild(option);
+          });
+
+          stats.available_tags.forEach((tag) => {
+            const option = document.createElement("option");
+            option.value = tag;
+            option.textContent = tag;
+            tagSelect.appendChild(option);
+          });
+        } catch (error) {
+          console.error(error);
+          emptyState.hidden = false;
+          emptyState.textContent = "Не удалось загрузить статистику";
+        }
+      }
+
+      async function loadLogs() {
+        try {
+          const query = buildQuery();
+          const data = await fetchJson(`${API_BASE}/api/logs?${query}`);
+          renderRows(data.items);
+        } catch (error) {
+          console.error(error);
+          emptyState.hidden = false;
+          emptyState.textContent = "Ошибка при загрузке логов";
+        }
+      }
+
+      document.getElementById("filters").addEventListener("input", () => {
+        loadLogs();
+      });
+
+      loadStats().then(loadLogs);
+    </script>
+  </body>
+</html>

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 class LogRecord(BaseModel):
     id: int
-    timestamp: datetime = Field(serialization_alias="ts")
+    timestamp: datetime
     source_ip: str
     source_port: int
     destination_host: str

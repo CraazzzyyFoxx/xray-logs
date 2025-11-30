@@ -10,4 +10,5 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.35",
     "pydantic-settings>=2.5.2",
     "asyncpg>=0.30.0",
+    "loguru>=0.7.3",
 ]

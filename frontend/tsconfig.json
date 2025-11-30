@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
     "lib": [
       "dom",
       "dom.iterable",
@@ -18,6 +19,11 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
       "@/*": [
         "./*"
       ]

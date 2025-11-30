@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -106,6 +107,18 @@ export function LogsPanel({ initialItems, initialTotal }: LogsPanelProps) {
             {logs.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="whitespace-nowrap">{new Date(row.timestamp).toLocaleString("ru-RU")}</TableCell>
+                <TableCell>
+                  {row.user_id ? (
+                    <Link
+                      href={`/users/${row.user_id}`}
+                      className="text-primary hover:underline"
+                    >
+                      {row.email || `user #${row.user_id}`}
+                    </Link>
+                  ) : (
+                    row.email || "—"
+                  )}
+                </TableCell>
                 <TableCell>{row.email || "—"}</TableCell>
                 <TableCell>
                   <div className="text-sm font-medium">{row.source_ip}</div>

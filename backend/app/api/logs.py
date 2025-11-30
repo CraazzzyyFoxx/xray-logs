@@ -58,6 +58,7 @@ async def list_logs(
         SELECT
             l.id,
             l."timestamp" as timestamp,
+            l.user_id,
             l.source_ip,
             l.source_port,
             e.address as destination_host,
@@ -72,6 +73,7 @@ async def list_logs(
         + " ORDER BY l.\"timestamp\" DESC LIMIT :limit OFFSET :offset"
     )
     results = await session.execute(rows_stmt, params)
+    items = [LogRecord.model_validate(dict(row._mapping)) for row in results]
     items = [LogRecord(
         id=row.id,
         timestamp=row.timestamp,

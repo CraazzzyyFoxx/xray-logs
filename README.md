@@ -1,262 +1,56 @@
-# Xray Log Ingestion & Analytics Pipeline
-
-This project provides a robust ingestion pipeline for xray-core access logs into PostgreSQL with:
-
-- Daily range-partitioned `logs` table by timestamp
-- Online and offline processing modes
-- Automatic partition creation
-- Reference tables for users, protocols, endpoints, and tags
-- Persistent per-run statistics in JSONL or CSV
-- Config-driven behavior and CLI overrides
-- Modern logging via [`loguru`](https://github.com/Delgan/loguru)
-
-The goal is to reliably parse xray-core logs, normalize them into a relational model, and keep the system operational even when the database is temporarily unavailable.
-
----
-
-## Features
-
-- **PostgreSQL-backed log storage**
-  - `logs` table partitioned by `timestamp` (daily partitions)
-  - Reference tables: `users`, `protocols`, `endpoints`, `tags`
-- **Automatic partition management**
-  - Creates daily partitions `logs_YYYY_MM_DD` on demand
-  - Supports historical migration from a non-partitioned `logs` table
-- **Online / Offline ingestion**
-  - **Online mode**: logs are inserted directly into PostgreSQL
-  - **Offline mode**: when DB is unavailable, logs are buffered into a JSONL file
-  - On the next successful online run, offline buffer is imported into the DB
-- **Per-run statistics**
-  - Stored in JSONL or CSV with:
-    - run timestamp, mode (`online` / `offline`)
-    - processed/failed line counts
-    - ingestion rate (lines/sec)
-    - counts of new users/endpoints/protocols/tags
-- **Config-driven**
-  - Single `config.ini` controls DB credentials, file paths, batch size, and stats output
-  - CLI parameter `--logfile` can override the logfile defined in the config
-- **Modern logging**
-  - Uses `loguru` for rich and readable logging output
-
----
-
-## Requirements
-
-- Python 3.10+ (3.12 recommended)
-- PostgreSQL 10+ (partitioned tables support)
-- Python packages:
-  - `psycopg` (psycopg3)
-  - `loguru`
+# Xray Log Ingestion & Analytics
 
-Install dependencies (example):
+This repository ingests xray-core access logs into PostgreSQL and ships a modern analytics UI built with **FastAPI**, **Next.js**, and **shadcn/ui**.
 
-```bash
-pip install psycopg[binary] loguru
-```
+- Normalized PostgreSQL schema (`logs`, `users`, `protocols`, `endpoints`, `tags`) with daily range partitioning (see [`SCHEMA.md`](SCHEMA.md)).
+- FastAPI backend that queries PostgreSQL for live log listings and aggregates.
+- Next.js 15 frontend with shadcn/ui components for filtering, search, and at-a-glance stats.
 
----
+## Quickstart: Analytics Stack
 
-## Configuration
+### Backend (FastAPI + PostgreSQL)
 
-The application is configured via `config.ini`. A typical configuration:
+1. Export database settings (or place them in `.env` with `XRAY_DATABASE_URL`).
 
-```ini
-[postgresql]
-host=localhost
-port=5432
-dbname=mydb
-user=myuser
-password=mypassword
+   ```bash
+   export XRAY_DATABASE_URL="postgresql+asyncpg://xray_logs:xray_logs@localhost:5432/xray_logs"
+   export XRAY_CORS_ALLOW_ORIGINS='["http://localhost:3000"]'
+   ```
 
-[parser]
-; Default logfile path (can be overridden by CLI --logfile)
-logfile=/var/log/xray/xray.log
+2. Install backend dependencies and start the API:
 
-; JSONL buffer for offline mode
-offline_file=/var/log/xray/pending_logs.jsonl
+   ```bash
+   uv run uvicorn backend.main:app --reload --port 8000
+   ```
 
-; Batch size for INSERTs into PostgreSQL
-batch_size=1000
+   Endpoints:
+   - `GET /health` — readiness probe.
+   - `GET /api/logs` — paginated list with `search`, `protocol`, `tag`, `limit`, `offset` filters.
+   - `GET /api/logs/stats` — totals, unique users, and top protocols/tags.
 
-[stats]
-; json or csv (leave empty/omit to disable file-based stats)
-format=json
+### Frontend (Next.js + shadcn/ui)
 
-; Path to stats output file. If omitted, stats are printed to stdout.
-output=/var/log/xray/parser_stats.jsonl
+1. Install Node dependencies inside `frontend/` (Node 18+):
 
-[migration]
-; Whether to drop logs_old after a successful migration
-drop_old=false
-```
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
-### Sections
+2. Open http://localhost:3000. The app fetches directly from the FastAPI API (configure via `NEXT_PUBLIC_API_BASE_URL`).
 
-- **[postgresql]** – DB connection parameters.
-- **[parser]**
-  - `logfile` – default path to the xray-core log file.
-  - `offline_file` – JSONL file used as a buffer when DB is unavailable.
-  - `batch_size` – number of rows per batch insert.
-- **[stats]**
-  - `format` – `json` (JSONL) or `csv`.
-  - `output` – file where stats are appended; if omitted, stats go to stdout.
-- **[migration]**
-  - `drop_old` – `true/false`, whether to drop `logs_old` after migration.
+Features:
+- Live counters for total events, unique users, protocol/tag top lists.
+- Log table with search by email/IP/hostname, protocol filter, and tag filter.
+- UI components taken from shadcn/ui (Button, Card, Badge, Table, Input).
 
----
+## Legacy ingestion pipeline
 
-## Database Schema
+The original log ingestion scripts remain available:
 
-The core schema consists of:
+- Partitioned schema and DDL are documented in [`SCHEMA.md`](SCHEMA.md).
+- `parse_logs.py` ingests xray-core logs into PostgreSQL with automatic partition creation and offline buffering.
+- `migrate_logs_to_partitioned.py` converts an existing non-partitioned `logs` table into the partitioned layout.
 
-- `users` – unique emails
-- `protocols` – protocol names (e.g., tcp, udp)
-- `endpoints` – destination hostnames/IPs
-- `tags` – logical routing tags (e.g., inbound, direct, api)
-- `logs` – main partitioned table with references to the above
-
-See **Schema.md** in this repository for a detailed description and DDL.
-
----
-
-## Migration to a Partitioned `logs` Table
-
-If you already have a non-partitioned `logs` table with data, use the migration script to convert it into a partitioned structure:
-
-```bash
-python migrate_logs_to_partitioned.py --config config.ini
-# or, to drop the old table after success:
-python migrate_logs_to_partitioned.py --config config.ini --drop-old
-```
-
-The migration script will:
-
-1. Rename `logs` → `logs_old`.
-2. Create a new `logs` table partitioned by `timestamp` (RANGE).
-3. Compute `[MIN(timestamp), MAX(timestamp)]` from `logs_old`.
-4. Create daily partitions for this range.
-5. Copy all rows from `logs_old` into the new `logs` table.
-6. Recreate indexes on `logs` (which propagate to partitions).
-7. Adjust the `logs.id` sequence.
-8. Optionally drop `logs_old`.
-
-> **Note:** Make sure your application is not writing to `logs` during the migration.
-
----
-
-## Log Format
-
-The parser expects xray-core-like log lines, for example:
-
-```text
-2025/11/17 10:15:23.123 from tcp:192.168.0.10 : 54321 accepted tcp:example.com : 443 [inbound >> direct] email:user@example.com
-```
-
-Or special API lines:
-
-```text
-2025/11/17 10:16:00.000 api from 10.0.0.1:12345 api -> api
-```
-
-The main pattern (simplified):
-
-- Date and time with microseconds: `YYYY/MM/DD HH:MM:SS.ffffff`
-- `from` section: `from [tcp|udp]:SRC_IP : SRC_PORT`
-- Action: `accepted`
-- Destination:
-  - `tcp:HOST : PORT`
-  - `udp:HOST : PORT`
-  - or `//HOST : PORT` (no explicit protocol)
-- Optional route: `[inbound >> direct]` or `[inbound -> direct]`
-- Optional email: `email:user@example.com`
-
-All recognized fields are normalized and inserted into the database.
-
----
-
-## Online vs Offline Modes
-
-### Online Mode
-
-If the DB connection succeeds:
-
-- Any pending offline buffer (`pending_logs.jsonl`) is imported first.
-- The current logfile is parsed and inserted directly into PostgreSQL.
-- Daily partitions are created automatically as needed.
-- On success:
-  - the logfile is truncated,
-  - the offline buffer is cleared.
-
-### Offline Mode
-
-If the DB connection fails:
-
-- The logfile is parsed.
-- Parsed records are appended to the JSONL buffer (`offline_file`).
-- The logfile is truncated (so the same lines are not reprocessed).
-- No database writes are attempted.
-- On the next successful online run, all buffered records are imported.
-
----
-
-## Statistics
-
-Each run (online or offline) produces a statistics record with:
-
-- `run_started_at` – ISO timestamp of when the run started
-- `mode` – `"online"` or `"offline"`
-- `duration_seconds`
-- `processed` – number of successfully processed lines
-- `failed` – number of lines that failed to parse
-- `rate_lines_per_second`
-- `new_users`
-- `new_endpoints`
-- `new_protocols`
-- `new_tags`
-
-### JSONL Example
-
-```json
-{"run_started_at": "2025-11-17T13:10:01.234567", "mode": "online", "duration_seconds": 1.23, "processed": 1024, "failed": 3, "rate_lines_per_second": 832.52, "new_users": 2, "new_endpoints": 5, "new_protocols": 0, "new_tags": 1}
-{"run_started_at": "2025-11-17T13:20:05.987654", "mode": "offline", "duration_seconds": 0.87, "processed": 512, "failed": 0, "rate_lines_per_second": 588.51, "new_users": 0, "new_endpoints": 1, "new_protocols": 0, "new_tags": 0}
-```
-
-### CSV Example
-
-```csv
-run_started_at,mode,duration_seconds,processed,failed,rate_lines_per_second,new_users,new_endpoints,new_protocols,new_tags
-2025-11-17T13:10:01.234567,online,1.23,1024,3,832.52,2,5,0,1
-2025-11-17T13:20:05.987654,offline,0.87,512,0,588.51,0,1,0,0
-```
-
----
-
-## Running the Parser
-
-Basic usage:
-
-```bash
-python parse_logs.py --config config.ini
-```
-
-Override logfile from the command line (ignores `[parser].logfile`):
-
-```bash
-python parse_logs.py --config config.ini --logfile /tmp/custom_xray.log
-```
-
-The script will:
-
-1. Check if the logfile exists and is non-empty.
-2. Attempt to connect to PostgreSQL.
-3. Choose **online** or **offline** mode depending on DB availability.
-4. Process logs accordingly and update statistics.
-
----
-
-## Notes & Tips
-
-- Make sure PostgreSQL has the required types (`INET`, `TIMESTAMPTZ` are built-ins).
-- Keep an eye on partition growth; you may want to archive or drop old partitions if the dataset becomes very large.
-- For heavy analytical workloads, consider additional indexes (e.g. `(user_id, timestamp)`).
-- You can use the statistics output to build dashboards (Grafana, Prometheus exporters, or simple pandas notebooks).
+Use these scripts to populate the database that powers the FastAPI analytics API.
